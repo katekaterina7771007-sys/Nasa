@@ -111,8 +111,8 @@ function TerrainMesh({
         shadow-camera-far={72}
       />
 
-      {/* Подложка-сетка для ощущения инженерного скана */}
-      <gridHelper args={[26, 13, '#27272a', '#18181b']} position={[0, -1.75, 0]} />
+      {/* Подложка-сетка для ощущения инженерного скана
+      <gridHelper args={[26, 13, '#27272a', '#18181b']} position={[0, -1.75, 0]} /> */}
 
       {/* Рельеф Луны */}
       <mesh geometry={geometry} receiveShadow castShadow>
