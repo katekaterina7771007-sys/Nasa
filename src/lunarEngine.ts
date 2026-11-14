@@ -1,0 +1,405 @@
+import * as Astronomy from 'astronomy-engine';
+import { ROVER_PROFILES } from './mockData';
+import type {
+  HorizonPoint,
+  ScenarioInput,
+  SimulationResult,
+  TimeStepData,
+} from './types';
+
+const MOON_RADIUS_M = 1737400;
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+
+export interface DemDataset {
+  width: number;
+  height: number;
+  resolutionM: number;
+  originXM: number;
+  originYM: number;
+  elevations: Float32Array;
+  groundTruth: unknown;
+}
+
+let cachedDemPromise: Promise<DemDataset> | null = null;
+
+/**
+ * Загружает и кэширует бинарную карту высот LOLA DEM и метаданные из public/data/
+ */
+export function loadLunarDem(): Promise<DemDataset> {
+  if (cachedDemPromise) return cachedDemPromise;
+
+  cachedDemPromise = (async () => {
+    const [metaRes, binRes, gtRes] = await Promise.all([
+      fetch('/data/dem_meta.json'),
+      fetch('/data/south_pole_dem.bin'),
+      fetch('/data/horizons_ground_truth.json').catch(() => null),
+    ]);
+
+    if (!metaRes.ok || !binRes.ok) {
+      throw new Error('Failed to load LOLA DEM files from /data/');
+    }
+
+    const meta = await metaRes.json();
+    const buffer = await binRes.arrayBuffer();
+    const elevations = new Float32Array(buffer);
+    const groundTruth = gtRes && gtRes.ok ? await gtRes.json() : null;
+
+    // Автоматически определяем размер сетки (по умолчанию 1024x1024 для 4MB Float32)
+    const inferredSide = Math.round(Math.sqrt(elevations.length));
+    const width: number = Number(meta.width ?? meta.cols ?? meta.size ?? inferredSide) || 1024;
+    const height: number = Number(meta.height ?? meta.rows ?? meta.size ?? inferredSide) || 1024;
+
+    // Определяем масштаб (метров на пиксель) из возможных ключей dem_meta.json
+    let resolutionM: number =
+      Number(
+        meta.resolution_m ??
+          meta.pixel_size_m ??
+          meta.scale_m ??
+          meta.step_m ??
+          meta.cell_size
+      ) || 0;
+
+    if (!resolutionM) {
+      const edgeLat = Number(meta.max_lat ?? meta.min_lat ?? meta.edge_lat ?? -80);
+      const colatRad = (90 - Math.abs(edgeLat)) * DEG2RAD;
+      const halfSpanM = 2 * MOON_RADIUS_M * Math.tan(colatRad / 2);
+      resolutionM = (halfSpanM * 2) / width;
+    }
+
+    // Координаты верхнего левого угла в полярной стереографической проекции (м)
+    const originXM: number =
+      Number(meta.x_min ?? meta.origin_x ?? meta.min_x) || -(width / 2) * resolutionM;
+    const originYM: number =
+      Number(meta.y_max ?? meta.origin_y ?? meta.max_y) || (height / 2) * resolutionM;
+
+    console.info(
+      `[LunarEngine] LOLA DEM loaded: ${width}x${height}, res=${resolutionM.toFixed(1)}m/px`
+    );
+
+    return {
+      width,
+      height,
+      resolutionM,
+      originXM,
+      originYM,
+      elevations,
+      groundTruth,
+    };
+  })();
+
+  return cachedDemPromise;
+}
+
+/**
+ * Переводит лунные координаты (lat, lon) в пиксели (px, py) на карте Южного полюса
+ */
+function latLonToPixel(lat: number, lon: number, dem: DemDataset): { px: number; py: number } {
+  const clampedLat = Math.max(-90, Math.min(-60, lat));
+  const colatRad = (90 + clampedLat) * DEG2RAD; // 0 на Южном полюсе (-90°)
+  const lonRad = lon * DEG2RAD;
+
+  // Полярная стереографическая проекция (0° долготы направлен вверх)
+  const r = 2 * MOON_RADIUS_M * Math.tan(colatRad / 2);
+  const xM = r * Math.sin(lonRad);
+  const yM = r * Math.cos(lonRad);
+
+  const px = Math.round((xM - dem.originXM) / dem.resolutionM);
+  const py = Math.round((dem.originYM - yM) / dem.resolutionM);
+
+  return {
+    px: Math.max(0, Math.min(dem.width - 1, px)),
+    py: Math.max(0, Math.min(dem.height - 1, py)),
+  };
+}
+
+function sampleElevation(dem: DemDataset, x: number, y: number): number {
+  const cx = Math.max(0, Math.min(dem.width - 1, Math.round(x)));
+  const cy = Math.max(0, Math.min(dem.height - 1, Math.round(y)));
+  const val = dem.elevations[cy * dem.width + cx];
+  return Number.isFinite(val) ? val : 0;
+}
+
+/**
+ * 360° Horizon Raycasting: вычисляет угол закрытия горизонта горами по реальным высотам LOLA
+ */
+function computeHorizonProfile(dem: DemDataset, centerPx: number, centerPy: number): HorizonPoint[] {
+  const siteElevM = sampleElevation(dem, centerPx, centerPy);
+  const maxSteps = Math.min(220, Math.floor(dem.width / 2));
+  const profile: HorizonPoint[] = [];
+
+  for (let az = 0; az < 360; az++) {
+    // Азимут: 0° = Север (вверх по карте -Y), 90° = Восток (+X)
+    const azRad = az * DEG2RAD;
+    const dx = Math.sin(azRad);
+    const dy = -Math.cos(azRad);
+
+    let maxAngleDeg = -5.0;
+
+    for (let step = 1; step <= maxSteps; step++) {
+      const rx = centerPx + dx * step;
+      const ry = centerPy + dy * step;
+
+      if (rx < 0 || rx >= dem.width || ry < 0 || ry >= dem.height) break;
+
+      const targetElevM = sampleElevation(dem, rx, ry);
+      const distM = step * dem.resolutionM;
+
+      // Учет кривизны лунной сферы (опускание горизонта с расстоянием)
+      const curvatureDropDeg = (distM / (2 * MOON_RADIUS_M)) * RAD2DEG;
+      const geomAngleDeg = Math.atan2(targetElevM - siteElevM, distM) * RAD2DEG;
+      const apparentAngleDeg = geomAngleDeg - curvatureDropDeg;
+
+      if (apparentAngleDeg > maxAngleDeg) {
+        maxAngleDeg = apparentAngleDeg;
+      }
+    }
+
+    profile.push({
+      azimuth: az,
+      terrainElevDeg: Number(maxAngleDeg.toFixed(2)),
+    });
+  }
+
+  return profile;
+}
+
+/**
+ * Переводит вектор из геоцентрической экваториальной системы J2000 (EQJ)
+ * в топоцентрические (Azimuth, Elevation) в точке (lat, lon) на Луне (стандарты IAU + либрация)
+ */
+function eqjToLunarTopocentric(
+  vecEqj: Astronomy.Vector,
+  astroTime: Astronomy.AstroTime,
+  latDeg: number,
+  lonDeg: number
+): { azimuth: number; elevation: number } {
+  const d = astroTime.ut; // дни от J2000.0
+  const T = d / 36525.0;
+
+  const E1 = (125.045 - 0.0529921 * d) * DEG2RAD;
+  const E2 = (250.089 - 0.1059842 * d) * DEG2RAD;
+  const E3 = (260.008 + 13.0120009 * d) * DEG2RAD;
+  const E4 = (176.625 + 13.3407154 * d) * DEG2RAD;
+  const E5 = (357.529 + 0.9856003 * d) * DEG2RAD;
+  const E6 = (311.589 + 26.4057084 * d) * DEG2RAD;
+  const E7 = (134.963 + 13.064993 * d) * DEG2RAD;
+  const E10 = (15.134 - 0.1589763 * d) * DEG2RAD;
+  const E13 = (25.053 + 12.9590088 * d) * DEG2RAD;
+
+  const alpha0 =
+    (269.9949 +
+      0.0031 * T -
+      3.8787 * Math.sin(E1) -
+      0.1204 * Math.sin(E2) +
+      0.07 * Math.sin(E3) -
+      0.0172 * Math.sin(E4) +
+      0.0072 * Math.sin(E6) -
+      0.0052 * Math.sin(E10) +
+      0.0043 * Math.sin(E13)) *
+    DEG2RAD;
+
+  const delta0 =
+    (66.5392 +
+      0.013 * T +
+      1.5419 * Math.cos(E1) +
+      0.0239 * Math.cos(E2) -
+      0.0278 * Math.cos(E3) +
+      0.0068 * Math.cos(E4) -
+      0.0029 * Math.cos(E6) +
+      0.0009 * Math.cos(E7) +
+      0.0008 * Math.cos(E10) -
+      0.0009 * Math.cos(E13)) *
+    DEG2RAD;
+
+  const W =
+    (38.3213 +
+      13.17635815 * d -
+      1.4e-12 * d * d +
+      3.561 * Math.sin(E1) +
+      0.1208 * Math.sin(E2) -
+      0.0642 * Math.sin(E3) +
+      0.0158 * Math.sin(E4) +
+      0.0252 * Math.sin(E5) -
+      0.0066 * Math.sin(E6) -
+      0.0047 * Math.sin(E7) +
+      0.0052 * Math.sin(E10) -
+      0.0044 * Math.sin(E13)) *
+    DEG2RAD;
+
+  // Поворот EQJ -> Селенографическая система координат Луны
+  const a = alpha0 + Math.PI / 2;
+  const b = Math.PI / 2 - delta0;
+
+  const x1 = Math.cos(a) * vecEqj.x + Math.sin(a) * vecEqj.y;
+  const y1 = -Math.sin(a) * vecEqj.x + Math.cos(a) * vecEqj.y;
+  const z1 = vecEqj.z;
+
+  const x2 = x1;
+  const y2 = Math.cos(b) * y1 + Math.sin(b) * z1;
+  const z2 = -Math.sin(b) * y1 + Math.cos(b) * z1;
+
+  const xSel = Math.cos(W) * x2 + Math.sin(W) * y2;
+  const ySel = -Math.sin(W) * x2 + Math.cos(W) * y2;
+  const zSel = z2;
+
+  // Переход в локальный горизонт наблюдателя (North, East, Up)
+  const phi = latDeg * DEG2RAD;
+  const lam = lonDeg * DEG2RAD;
+
+  const up =
+    xSel * Math.cos(phi) * Math.cos(lam) +
+    ySel * Math.cos(phi) * Math.sin(lam) +
+    zSel * Math.sin(phi);
+  const east = -xSel * Math.sin(lam) + ySel * Math.cos(lam);
+  const north =
+    -xSel * Math.sin(phi) * Math.cos(lam) -
+    ySel * Math.sin(phi) * Math.sin(lam) +
+    zSel * Math.cos(phi);
+
+  const dist = Math.hypot(up, east, north) || 1;
+  const elevation = Math.asin(Math.max(-1, Math.min(1, up / dist))) * RAD2DEG;
+  const azimuth = (Math.atan2(east, north) * RAD2DEG + 360) % 360;
+
+  return { azimuth, elevation };
+}
+
+/**
+ * Запускает полную симуляцию по реальной карте высот LOLA и эфемеридам
+ */
+export function runLunarSimulation(input: ScenarioInput, dem: DemDataset): SimulationResult {
+  const { px, py } = latLonToPixel(input.lat, input.lon, dem);
+  const siteElevM = sampleElevation(dem, px, py);
+
+  // Вырезаем квадрат 96x96 вокруг точки посадки для 3D-сцены
+  const gridSize = 96;
+  const half = Math.floor(gridSize / 2);
+  const heightmap = new Float32Array(gridSize * gridSize);
+
+  // Масштабируем реальные метры в единицы 3D-сцены (1000м ≈ 1.4 ед. высоты)
+  const verticalScale = 1 / 700;
+
+  for (let gz = 0; gz < gridSize; gz++) {
+    for (let gx = 0; gx < gridSize; gx++) {
+      const sampleX = px - half + gx;
+      const sampleY = py - half + gz;
+      const elevM = sampleElevation(dem, sampleX, sampleY);
+      heightmap[gz * gridSize + gx] = (elevM - siteElevM) * verticalScale;
+    }
+  }
+
+  // Строим реальный профиль горизонта на 360°
+  const horizonProfile = computeHorizonProfile(dem, px, py);
+
+  const totalHours = input.durationDays * 24;
+  const startMs = new Date(input.startDateIso).getTime();
+  const timeline: TimeStepData[] = [];
+
+  const rover = ROVER_PROFILES.find((r) => r.id === input.roverId) ?? ROVER_PROFILES[0];
+
+  let sunVisibleHours = 0;
+  let earthVisibleHours = 0;
+  let totalEnergyWh = 0;
+  let currentDarkStreak = 0;
+  let maxDarkStreak = 0;
+  let currentBlackoutStreak = 0;
+  let maxBlackoutStreak = 0;
+
+  for (let h = 0; h < totalHours; h++) {
+    const stepDate = new Date(startMs + h * 3600 * 1000);
+    const astroTime = Astronomy.MakeTime(stepDate);
+
+    const geoSun = Astronomy.GeoVector(Astronomy.Body.Sun, astroTime, true);
+    const geoMoon = Astronomy.GeoVector(Astronomy.Body.Moon, astroTime, true);
+
+    // Вектор Луна -> Солнце и Луна -> Земля
+    const moonToSun = new Astronomy.Vector(
+      geoSun.x - geoMoon.x,
+      geoSun.y - geoMoon.y,
+      geoSun.z - geoMoon.z,
+      astroTime
+    );
+    const moonToEarth = new Astronomy.Vector(-geoMoon.x, -geoMoon.y, -geoMoon.z, astroTime);
+
+    const sunTopo = eqjToLunarTopocentric(moonToSun, astroTime, input.lat, input.lon);
+    const earthTopo = eqjToLunarTopocentric(moonToEarth, astroTime, input.lat, input.lon);
+
+    const sunAzIdx = Math.floor(sunTopo.azimuth) % 360;
+    const earthAzIdx = Math.floor(earthTopo.azimuth) % 360;
+
+    const isSunVisible = sunTopo.elevation > horizonProfile[sunAzIdx].terrainElevDeg;
+    const isEarthVisible = earthTopo.elevation > horizonProfile[earthAzIdx].terrainElevDeg;
+
+    const effectiveAngle = Math.max(0, sunTopo.elevation);
+    const powerOutputWatts = isSunVisible
+      ? Math.round(480 * Math.max(0.18, Math.sin(((effectiveAngle + 12) * Math.PI) / 180)))
+      : 0;
+
+    if (isSunVisible) {
+      sunVisibleHours++;
+      currentDarkStreak = 0;
+    } else {
+      currentDarkStreak++;
+      if (currentDarkStreak > maxDarkStreak) maxDarkStreak = currentDarkStreak;
+    }
+
+    if (isEarthVisible) {
+      earthVisibleHours++;
+      currentBlackoutStreak = 0;
+    } else {
+      currentBlackoutStreak++;
+      if (currentBlackoutStreak > maxBlackoutStreak) maxBlackoutStreak = currentBlackoutStreak;
+    }
+
+    totalEnergyWh += powerOutputWatts;
+
+    timeline.push({
+      timestampIso: stepDate.toISOString(),
+      hoursFromStart: h,
+      sunAzimuth: sunTopo.azimuth,
+      sunElevation: sunTopo.elevation,
+      earthAzimuth: earthTopo.azimuth,
+      earthElevation: earthTopo.elevation,
+      isSunVisible,
+      isEarthVisible,
+      powerOutputWatts,
+    });
+  }
+
+  const firstDarkIdx = timeline.findIndex((s) => !s.isSunVisible);
+  const firstNoCommsIdx = timeline.findIndex((s) => !s.isEarthVisible);
+
+  const sunlightPercent = Math.round((sunVisibleHours / totalHours) * 100);
+  const earthCommsPercent = Math.round((earthVisibleHours / totalHours) * 100);
+
+  let status: 'optimal' | 'warning' | 'critical' = 'optimal';
+  let statusReason = 'Nominal power & Direct-to-Earth comms';
+
+  if (maxDarkStreak > rover.maxDarknessHours || sunlightPercent < 30) {
+    status = 'critical';
+    statusReason = `Critical shadow: ${maxDarkStreak}h continuous darkness`;
+  } else if (maxBlackoutStreak > rover.maxCommsBlackoutHours || earthCommsPercent < 45) {
+    status = 'warning';
+    statusReason = `Comms gap up to ${maxBlackoutStreak}h (terrain occlusion)`;
+  } else if (sunlightPercent < 65) {
+    status = 'warning';
+    statusReason = 'Battery hibernation needed during shadow';
+  }
+
+  return {
+    input,
+    gridSize,
+    heightmap,
+    horizonProfile,
+    timeline,
+    metrics: {
+      sunlightPercent,
+      earthCommsPercent,
+      hoursUntilSunset: firstDarkIdx === -1 ? null : firstDarkIdx,
+      hoursUntilEarthset: firstNoCommsIdx === -1 ? null : firstNoCommsIdx,
+      totalEnergyKwh: Number((totalEnergyWh / 1000).toFixed(1)),
+      status,
+      statusReason,
+    },
+  };
+}

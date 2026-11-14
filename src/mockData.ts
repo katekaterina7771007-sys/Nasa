@@ -10,49 +10,49 @@ import type {
 export const LANDING_PRESETS: LandingPreset[] = [
   {
     id: 'shackleton-rim',
-    name: 'Край кратера Шеклтон',
-    region: 'Южный полюс (89.54° S)',
+    name: 'Shackleton Crater Rim',
+    region: 'South Pole (89.54° S)',
     lat: -89.54,
     lon: 0.0,
-    description: 'Вал вечного света рядом с вечно затененным кратером со льдом.',
+    description: 'Peak of eternal light adjacent to a permanently shadowed ice-bearing crater.',
   },
   {
     id: 'malapert-massif',
-    name: 'Хребет Малаперт',
+    name: 'Malapert Massif',
     region: '86.0° S, 2.5° E',
     lat: -86.0,
     lon: 2.5,
-    description: 'Высокое плато с отличной прямой видимостью Земли (DTE).',
+    description: 'Elevated ridge offering near-continuous Direct-to-Earth (DTE) line of sight.',
   },
   {
     id: 'shiv-shakti',
-    name: 'Точка Шив Шакти (Чандраян-3)',
+    name: 'Shiv Shakti Point (Chandrayaan-3)',
     region: '69.37° S, 32.32° E',
     lat: -69.37,
     lon: 32.32,
-    description: 'Историческая площадка первой мягкой посадки у Южного полюса.',
+    description: 'Historic site of the first soft landing near the lunar south polar region.',
   },
   {
     id: 'cabeus-floor',
-    name: 'Дно кратера Кабеус (PSR)',
+    name: 'Cabeus Crater Floor (PSR)',
     region: '84.9° S, 35.5° W',
     lat: -84.9,
     lon: -35.5,
-    description: 'Экстремальная зона вечной тени — высокий риск замерзания.',
+    description: 'Extreme Permanently Shadowed Region — severe thermal and power risk.',
   },
 ];
 
 export const ROVER_PROFILES: RoverProfile[] = [
   {
     id: 'csa-rover',
-    name: 'Полярный ровер (класс CSA)',
+    name: 'Polar Rover (CSA Class)',
     minSunElevationDeg: 2.0,
     maxDarknessHours: 72,
     maxCommsBlackoutHours: 24,
   },
   {
     id: 'clps-lander',
-    name: 'Посадочный модуль CLPS',
+    name: 'CLPS Commercial Lander',
     minSunElevationDeg: 3.0,
     maxDarknessHours: 48,
     maxCommsBlackoutHours: 12,
@@ -63,7 +63,6 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
   const gridSize = 96;
   const heightmap = new Float32Array(gridSize * gridSize);
 
-  // Сдвиг рельефа в зависимости от координат, чтобы разные точки выглядели по-разному
   const seed = Math.abs(input.lat * 13.7 + input.lon * 7.3);
   const isDeepCrater = input.presetId === 'cabeus-floor';
 
@@ -73,7 +72,6 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
       const nz = (z / (gridSize - 1)) * 2 - 1;
       const dist = Math.sqrt(nx * nx + nz * nz);
 
-      // Основной кратер + хребты по краям
       const crater = isDeepCrater
         ? Math.pow(dist, 2) * 3.8 - 1.5
         : Math.exp(-Math.pow((dist - 0.55) / 0.22, 2)) * 2.2 - Math.exp(-dist * dist * 5) * 1.4;
@@ -86,7 +84,6 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
     }
   }
 
-  // Профиль закрытия горизонта горами на 360°
   const horizonProfile: HorizonPoint[] = Array.from({ length: 360 }, (_, az) => {
     const rad = (az * Math.PI) / 180;
     const baseWall = isDeepCrater ? 6.5 : 1.8;
@@ -111,13 +108,11 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
 
   for (let h = 0; h < totalHours; h++) {
     const t = h + dateOffsetHours;
-    // Лунные сутки = ~708.7 часа
     const lunarPhase = (t / 708.7) * Math.PI * 2;
     const sunAzimuth = ((t / 708.7) * 360) % 360;
-    const maxSunAngle = 90 - Math.abs(input.lat) + 1.54; // наклон оси Луны 1.54°
+    const maxSunAngle = 90 - Math.abs(input.lat) + 1.54;
     const sunElevation = Math.sin(lunarPhase) * maxSunAngle + 1.2;
 
-    // Либрация Земли ("восьмерка" в небе Луны)
     const libPhase = (t / 655.7) * Math.PI * 2;
     const earthAzimuth = (180 + input.lon + Math.sin(libPhase) * 7.5 + 360) % 360;
     const earthElevation = (90 - Math.abs(input.lat)) * 0.9 + Math.sin(libPhase * 2) * 6.5;
@@ -149,7 +144,6 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
     });
   }
 
-  // Таймеры от начального момента
   const firstDarkIdx = timeline.findIndex((step) => !step.isSunVisible);
   const firstNoCommsIdx = timeline.findIndex((step) => !step.isEarthVisible);
 
@@ -157,14 +151,14 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
   const earthCommsPercent = Math.round((earthVisibleHours / totalHours) * 100);
 
   let status: 'optimal' | 'warning' | 'critical' = 'optimal';
-  let statusReason = 'Стабильное питание и прямая связь с Землей';
+  let statusReason = 'Nominal power & Direct-to-Earth comms';
 
   if (sunlightPercent < 35 || earthCommsPercent < 40) {
     status = 'critical';
-    statusReason = 'Высокий риск замерзания и потери связи';
+    statusReason = 'High risk of thermal freeze & comms blackout';
   } else if (sunlightPercent < 65 || earthCommsPercent < 70) {
     status = 'warning';
-    statusReason = 'Требуется режим энергосбережения в тени';
+    statusReason = 'Low-power hibernation required in shadow';
   }
 
   return {
