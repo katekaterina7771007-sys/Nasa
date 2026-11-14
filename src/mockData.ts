@@ -10,35 +10,35 @@ import type {
 export const LANDING_PRESETS: LandingPreset[] = [
   {
     id: 'shackleton-rim',
-    name: 'Shackleton Crater Rim',
-    region: 'South Pole (89.54° S)',
-    lat: -89.54,
+    name: 'Shackleton Rim (Peak of Eternal Light)',
+    region: '89.87° S, 157.26° E',
+    lat: -89.873,
+    lon: 157.26,
+    description: 'Highest point on the Shackleton rim (+1647m) with maximum continuous solar illumination.',
+  },
+  {
+    id: 'shackleton-floor-psr',
+    name: 'Shackleton Crater Floor (PSR)',
+    region: '89.67° S, 129.8° E',
+    lat: -89.67,
+    lon: 129.8,
+    description: 'Deep Permanently Shadowed Region (PSR) — 0% direct sunlight and total terrain blockage.',
+  },
+  {
+    id: 'connecting-ridge',
+    name: 'Connecting Ridge (Artemis III)',
+    region: '89.45° S, 137.5° W',
+    lat: -89.45,
+    lon: -137.5,
+    description: 'High-priority NASA Artemis III candidate ridge linking Shackleton and de Gerlache craters.',
+  },
+  {
+    id: 'south-pole-center',
+    name: 'Geographic South Pole (90° S)',
+    region: '90.00° S, 0.0° E',
+    lat: -90.0,
     lon: 0.0,
-    description: 'Peak of eternal light adjacent to a permanently shadowed ice-bearing crater.',
-  },
-  {
-    id: 'malapert-massif',
-    name: 'Malapert Massif',
-    region: '86.0° S, 2.5° E',
-    lat: -86.0,
-    lon: 2.5,
-    description: 'Elevated ridge offering near-continuous Direct-to-Earth (DTE) line of sight.',
-  },
-  {
-    id: 'shiv-shakti',
-    name: 'Shiv Shakti Point (Chandrayaan-3)',
-    region: '69.37° S, 32.32° E',
-    lat: -69.37,
-    lon: 32.32,
-    description: 'Historic site of the first soft landing near the lunar south polar region.',
-  },
-  {
-    id: 'cabeus-floor',
-    name: 'Cabeus Crater Floor (PSR)',
-    region: '84.9° S, 35.5° W',
-    lat: -84.9,
-    lon: -35.5,
-    description: 'Extreme Permanently Shadowed Region — severe thermal and power risk.',
+    description: 'Exact rotational south pole of the Moon at the center of the LOLA DEM tile.',
   },
 ];
 
@@ -57,6 +57,13 @@ export const ROVER_PROFILES: RoverProfile[] = [
     maxDarknessHours: 48,
     maxCommsBlackoutHours: 12,
   },
+  {
+    id: 'artemis-habitat',
+    name: 'Artemis Base Power Station',
+    minSunElevationDeg: 1.5,
+    maxDarknessHours: 120,
+    maxCommsBlackoutHours: 48,
+  },
 ];
 
 export function generateMockSimulation(input: ScenarioInput): SimulationResult {
@@ -64,7 +71,7 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
   const heightmap = new Float32Array(gridSize * gridSize);
 
   const seed = Math.abs(input.lat * 13.7 + input.lon * 7.3);
-  const isDeepCrater = input.presetId === 'cabeus-floor';
+  const isDeepCrater = input.presetId === 'shackleton-floor-psr';
 
   for (let z = 0; z < gridSize; z++) {
     for (let x = 0; x < gridSize; x++) {
@@ -163,6 +170,8 @@ export function generateMockSimulation(input: ScenarioInput): SimulationResult {
 
   return {
     input,
+    isInsideDem: true,
+    patchSpanKm: 20.7,
     gridSize,
     heightmap,
     horizonProfile,

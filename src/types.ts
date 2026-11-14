@@ -27,8 +27,8 @@ export interface ScenarioInput {
 }
 
 export interface HorizonPoint {
-  azimuth: number; // 0..359°
-  terrainElevDeg: number; // высота гор/вала кратера над сферой
+  azimuth: number;
+  terrainElevDeg: number;
 }
 
 export interface TimeStepData {
@@ -45,8 +45,10 @@ export interface TimeStepData {
 
 export interface SimulationResult {
   input: ScenarioInput;
+  isInsideDem: boolean;
+  patchSpanKm: number;
   gridSize: number;
-  heightmap: Float32Array; // сетка высот для 3D-ландшафта
+  heightmap: Float32Array;
   horizonProfile: HorizonPoint[];
   timeline: TimeStepData[];
   metrics: {

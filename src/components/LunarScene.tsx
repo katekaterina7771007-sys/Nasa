@@ -97,7 +97,7 @@ function TerrainMesh({
       <ambientLight intensity={0.07} color="#94a3b8" />
       <directionalLight
         position={sunPos}
-        intensity={isSunUp ? 3.5 : 0}
+        intensity={isSunUp ? 6.5 : 0}
         color="#fff6e5"
         castShadow
         shadow-mapSize={[2048, 2048]}
@@ -116,7 +116,7 @@ function TerrainMesh({
 
       {/* Рельеф Луны */}
       <mesh geometry={geometry} receiveShadow castShadow>
-        <meshStandardMaterial color="#8e9094" roughness={0.96} metalness={0.04} />
+        <meshStandardMaterial color="#b4b7bd" roughness={0.94} metalness={0.04} />
       </mesh>
 
       <LandingBeacon position={[0, centerHeight, 0]} />
@@ -161,7 +161,9 @@ export function LunarScene({ result, currentStep }: Props) {
       {/* Верхняя левая плашка телеметрии */}
       <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
         <span className="rounded-md border border-white/10 bg-black/70 px-2 py-0.5 font-mono text-[10px] tracking-wider text-zinc-300 backdrop-blur-md">
-          DEM 96×96 // 3D TERRAIN
+          {result.isInsideDem
+            ? `LOLA DEM // ${result.patchSpanKm}×${result.patchSpanKm} KM`
+            : 'OUTSIDE LOLA TILE // SPHERICAL'}
         </span>
         <span className="hidden rounded-md border border-white/10 bg-black/70 px-2 py-0.5 font-mono text-[10px] text-zinc-400 backdrop-blur-md sm:inline">
           DRAG TO ORBIT

@@ -34,20 +34,20 @@ export function App() {
     id: 'A',
     presetId: 'shackleton-rim',
     name: 'Scenario A: Shackleton Rim',
-    lat: -89.54,
-    lon: 0.0,
+    lat: -89.873,
+    lon: 157.26,
     startDateIso: '2026-11-15T00:00:00Z',
     durationDays: 14,
-    roverId: 'csa-rover',
+    roverId: 'artemis-habitat',
   });
 
   const [scenarioB, setScenarioB] = useState<ScenarioInput>({
     id: 'B',
-    presetId: 'cabeus-floor',
-    name: 'Scenario B: Cabeus Crater',
-    lat: -84.9,
-    lon: -35.5,
-    startDateIso: '2026-11-29T00:00:00Z',
+    presetId: 'shackleton-floor-psr',
+    name: 'Scenario B: Shackleton Crater Floor (PSR)',
+    lat: -89.67,
+    lon: 129.8,
+    startDateIso: '2026-11-15T00:00:00Z',
     durationDays: 14,
     roverId: 'csa-rover',
   });
@@ -130,7 +130,7 @@ const resultB = useMemo(
           };
 
     return (
-      <section className="flex flex-col gap-3.5 rounded-2xl border border-white/10 bg-[#111318] p-4 shadow-2xl shadow-black/50 ring-1 ring-inset ring-white/[0.03]">
+      <section className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-[#111318] p-3 shadow-2xl shadow-black/50 ring-1 ring-inset ring-white/[0.03]">
         {/* Верхняя панель карточки: выбор точки и даты */}
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
@@ -174,14 +174,17 @@ const resultB = useMemo(
 
         {/* Координаты и вердикт пригодности */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-y border-white/[0.06] py-2 text-xs">
-          <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-400">
+          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-zinc-400">
             <label className="flex items-center gap-1">
               <span className="text-zinc-500">LAT</span>
               <input
                 type="number"
                 step="0.1"
                 value={input.lat}
-                onChange={(e) => setInput((prev) => ({ ...prev, lat: Number(e.target.value) }))}
+                onChange={(e) => {
+                  const parsed = Number(e.target.value.replace(',', '.'));
+                  if (!Number.isNaN(parsed)) setInput((prev) => ({ ...prev, lat: parsed }));
+                }}
                 className="w-16 rounded border border-white/10 bg-black/50 px-1.5 py-0.5 text-zinc-200 outline-none focus:border-orange-500"
               />
             </label>
@@ -191,10 +194,20 @@ const resultB = useMemo(
                 type="number"
                 step="0.1"
                 value={input.lon}
-                onChange={(e) => setInput((prev) => ({ ...prev, lon: Number(e.target.value) }))}
+                onChange={(e) => {
+                  const parsed = Number(e.target.value.replace(',', '.'));
+                  if (!Number.isNaN(parsed)) setInput((prev) => ({ ...prev, lon: parsed }));
+                }}
                 className="w-16 rounded border border-white/10 bg-black/50 px-1.5 py-0.5 text-zinc-200 outline-none focus:border-orange-500"
               />
             </label>
+
+            {/* ВОТ СЮДА: индикатор выхода за пределы карты LOLA */}
+            {!result.isInsideDem && (
+              <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] text-amber-300">
+                OUTSIDE ±37KM DEM TILE
+              </span>
+            )}
           </div>
 
           <div
