@@ -1,0 +1,17 @@
+{
+  "source": "qmq_20261114_115606_996_t1794657359_p3096774.tif",
+  "projection": "MOON_SOUTH_POLE_STEREOGRAPHIC",
+  "lunarRadiusM": 1737400.0,
+  "width": 1024,
+  "height": 1024,
+  "dtype": "float32",
+  "pixelSizeM": 71.99,
+  "boundsM": {
+    "minX": -37242.7072095,
+    "maxX": 37241.15001850001,
+    "minY": -36475.934167,
+    "maxY": 36475.933833
+  },
+  "minElevationM": -3013.52,
+  "maxElevationM": 1647.05
+}

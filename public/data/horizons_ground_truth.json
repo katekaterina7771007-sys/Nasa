@@ -1,0 +1,193 @@
+{
+  "source": "NASA JPL Horizons System (coord@301, QUANTITIES=4)",
+  "periodUTC": {
+    "start": "2026-11-15 00:00",
+    "stop": "2026-11-16 00:00",
+    "step": "6h"
+  },
+  "sites": [
+    {
+      "id": "shackleton_rim",
+      "name": "Shackleton Crater Rim (Connecting Ridge)",
+      "lat": -89.78,
+      "lon": 0.0,
+      "elev_km": 1.5,
+      "sun": [
+        {
+          "utc": "2026-Nov-15 00:00",
+          "azimuthDeg": 114.4366,
+          "elevationDeg": 1.4654
+        },
+        {
+          "utc": "2026-Nov-15 06:00",
+          "azimuthDeg": 111.3911,
+          "elevationDeg": 1.4759
+        },
+        {
+          "utc": "2026-Nov-15 12:00",
+          "azimuthDeg": 108.346,
+          "elevationDeg": 1.4866
+        },
+        {
+          "utc": "2026-Nov-15 18:00",
+          "azimuthDeg": 105.3012,
+          "elevationDeg": 1.4975
+        },
+        {
+          "utc": "2026-Nov-16 00:00",
+          "azimuthDeg": 102.2568,
+          "elevationDeg": 1.5085
+        }
+      ],
+      "earth": [
+        {
+          "utc": "2026-Nov-15 00:00",
+          "azimuthDeg": 357.3805,
+          "elevationDeg": -3.3334
+        },
+        {
+          "utc": "2026-Nov-15 06:00",
+          "azimuthDeg": 357.0345,
+          "elevationDeg": -3.0351
+        },
+        {
+          "utc": "2026-Nov-15 12:00",
+          "azimuthDeg": 356.6919,
+          "elevationDeg": -2.7284
+        },
+        {
+          "utc": "2026-Nov-15 18:00",
+          "azimuthDeg": 356.3539,
+          "elevationDeg": -2.4138
+        },
+        {
+          "utc": "2026-Nov-16 00:00",
+          "azimuthDeg": 356.0221,
+          "elevationDeg": -2.092
+        }
+      ]
+    },
+    {
+      "id": "malapert_massif",
+      "name": "Malapert Massif Peak",
+      "lat": -85.95,
+      "lon": 12.9,
+      "elev_km": 4.8,
+      "sun": [
+        {
+          "utc": "2026-Nov-15 00:00",
+          "azimuthDeg": 101.611,
+          "elevationDeg": 0.7437
+        },
+        {
+          "utc": "2026-Nov-15 06:00",
+          "azimuthDeg": 98.5735,
+          "elevationDeg": 0.9552
+        },
+        {
+          "utc": "2026-Nov-15 12:00",
+          "azimuthDeg": 95.5364,
+          "elevationDeg": 1.1683
+        },
+        {
+          "utc": "2026-Nov-15 18:00",
+          "azimuthDeg": 92.4994,
+          "elevationDeg": 1.3825
+        },
+        {
+          "utc": "2026-Nov-16 00:00",
+          "azimuthDeg": 89.4626,
+          "elevationDeg": 1.5971
+        }
+      ],
+      "earth": [
+        {
+          "utc": "2026-Nov-15 00:00",
+          "azimuthDeg": 344.5056,
+          "elevationDeg": 0.3487
+        },
+        {
+          "utc": "2026-Nov-15 06:00",
+          "azimuthDeg": 344.1544,
+          "elevationDeg": 0.6404
+        },
+        {
+          "utc": "2026-Nov-15 12:00",
+          "azimuthDeg": 343.8062,
+          "elevationDeg": 0.9406
+        },
+        {
+          "utc": "2026-Nov-15 18:00",
+          "azimuthDeg": 343.4623,
+          "elevationDeg": 1.2486
+        },
+        {
+          "utc": "2026-Nov-16 00:00",
+          "azimuthDeg": 343.1242,
+          "elevationDeg": 1.5637
+        }
+      ]
+    },
+    {
+      "id": "chandrayaan_3",
+      "name": "Shiv Shakti Point (Chandrayaan-3)",
+      "lat": -69.373,
+      "lon": 32.319,
+      "elev_km": -1.1,
+      "sun": [
+        {
+          "utc": "2026-Nov-15 00:00",
+          "azimuthDeg": 83.1576,
+          "elevationDeg": 4.2291
+        },
+        {
+          "utc": "2026-Nov-15 06:00",
+          "azimuthDeg": 80.2942,
+          "elevationDeg": 5.2906
+        },
+        {
+          "utc": "2026-Nov-15 12:00",
+          "azimuthDeg": 77.4228,
+          "elevationDeg": 6.3428
+        },
+        {
+          "utc": "2026-Nov-15 18:00",
+          "azimuthDeg": 74.5417,
+          "elevationDeg": 7.3831
+        },
+        {
+          "utc": "2026-Nov-16 00:00",
+          "azimuthDeg": 71.6489,
+          "elevationDeg": 8.4088
+        }
+      ],
+      "earth": [
+        {
+          "utc": "2026-Nov-15 00:00",
+          "azimuthDeg": 323.9761,
+          "elevationDeg": 13.3119
+        },
+        {
+          "utc": "2026-Nov-15 06:00",
+          "azimuthDeg": 323.5642,
+          "elevationDeg": 13.5319
+        },
+        {
+          "utc": "2026-Nov-15 12:00",
+          "azimuthDeg": 323.153,
+          "elevationDeg": 13.7601
+        },
+        {
+          "utc": "2026-Nov-15 18:00",
+          "azimuthDeg": 322.7438,
+          "elevationDeg": 13.9962
+        },
+        {
+          "utc": "2026-Nov-16 00:00",
+          "azimuthDeg": 322.3382,
+          "elevationDeg": 14.2398
+        }
+      ]
+    }
+  ]
+}
