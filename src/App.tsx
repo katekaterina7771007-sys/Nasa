@@ -85,7 +85,58 @@ const resultB = useMemo(
     if (side === 'A') setScenarioA(updater);
     else setScenarioB(updater);
   };
+  const [activeQuest, setActiveQuest] = useState<'delay' | 'rescue' | null>(null);
 
+  const loadExplorerQuest = (quest: 'delay' | 'rescue') => {
+    setActiveQuest(quest);
+    setIsSplitMode(true);
+    setHourIndex(18);
+    if (quest === 'delay') {
+      // Кейс 1: Перенос запуска на 14 дней (15 ноя vs 29 ноя)
+      setScenarioA({
+        id: 'A',
+        presetId: 'shackleton-rim',
+        name: 'Scenario A: Nov 15 Launch',
+        lat: -89.873,
+        lon: 157.26,
+        startDateIso: '2026-11-15T00:00:00Z',
+        durationDays: 14,
+        roverId: 'csa-rover',
+      });
+      setScenarioB({
+        id: 'B',
+        presetId: 'shackleton-rim',
+        name: 'Scenario B: Nov 29 (+14d Delay)',
+        lat: -89.873,
+        lon: 157.26,
+        startDateIso: '2026-11-29T00:00:00Z',
+        durationDays: 14,
+        roverId: 'csa-rover',
+      });
+    } else {
+      // Кейс 2: Спаси ровер из кратера вечной тени (PSR)
+      setScenarioA({
+        id: 'A',
+        presetId: 'shackleton-floor-psr',
+        name: 'Scenario A: Crater Trap (PSR)',
+        lat: -89.67,
+        lon: 129.8,
+        startDateIso: '2026-11-15T00:00:00Z',
+        durationDays: 14,
+        roverId: 'csa-rover',
+      });
+      setScenarioB({
+        id: 'B',
+        presetId: 'connecting-ridge',
+        name: 'Scenario B: Rescue Site',
+        lat: -89.45,
+        lon: -137.5,
+        startDateIso: '2026-11-15T00:00:00Z',
+        durationDays: 14,
+        roverId: 'csa-rover',
+      });
+    }
+  };  
   const handleExportReport = () => {
     const payload = {
       generatedAt: new Date().toISOString(),
@@ -378,15 +429,42 @@ const resultB = useMemo(
 
       {/* Подсказка-квест для режима Исследователя */}
       {!isEngineerMode && (
-        <div className="mx-auto mt-4 w-full max-w-[1440px] px-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-500/25 bg-sky-950/25 px-4 py-2.5 text-xs text-sky-200">
-            <div>
+        <div className="mx-auto mt-3 w-full max-w-[1440px] px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-500/25 bg-sky-950/25 px-4 py-2 text-xs text-sky-200">
+            <div className="flex-1">
               <strong className="font-mono uppercase tracking-wider text-sky-400">
-                Guided Mission Brief:{' '}
+                Interactive Mission Challenges:{' '}
               </strong>
-              Near the lunar south pole, the Sun skims the horizon at 1.5°–5°. Shift the landing
-              date in Scenario B by 14 days to see how crater rim shadows cut off power and Earth
-              line-of-sight.
+              {activeQuest === 'delay'
+                ? 'Launch slipped +14 days! Compare Earth libration & comms blackouts between Nov 15 (A) and Nov 29 (B).'
+                : activeQuest === 'rescue'
+                ? resultB.metrics.sunlightPercent >= 80
+                  ? 'MISSION SAVED! You relocated the rover to an illuminated rim peak.'
+                  : 'Scenario A is trapped in permanent shadow (2% Sun). Tune Scenario B coordinates or hardware to reach ≥80% Sun!'
+                : 'Select a challenge to test how launch delays and crater shadows affect lunar survival:'}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => loadExplorerQuest('delay')}
+                className={`rounded-lg border px-2.5 py-1 font-mono text-[11px] transition ${
+                  activeQuest === 'delay'
+                    ? 'border-sky-400 bg-sky-500/25 text-white'
+                    : 'border-sky-500/30 bg-black/40 text-sky-300 hover:bg-sky-500/15'
+                }`}
+              >
+                Case 1: +14d Launch Delay
+              </button>
+              <button
+                onClick={() => loadExplorerQuest('rescue')}
+                className={`rounded-lg border px-2.5 py-1 font-mono text-[11px] transition ${
+                  activeQuest === 'rescue'
+                    ? 'border-emerald-400 bg-emerald-500/25 text-white'
+                    : 'border-sky-500/30 bg-black/40 text-sky-300 hover:bg-sky-500/15'
+                }`}
+              >
+                Case 2: Rescue from PSR Trap
+              </button>
             </div>
           </div>
         </div>
